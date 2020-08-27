@@ -22,7 +22,7 @@ db = server.twitter_db
 posts = db.reddit_test
 
 webhook = Webhook.partial(
-    webhook_id_reddit, webhook_token_reddit, adapter=RequestsWebhookAdapter()
+    webhook_id_twitter, webhook_token_twitter, adapter=RequestsWebhookAdapter()
 )
 
 

@@ -44,5 +44,4 @@ async def unload(ctx, extension):
 
 
 # Start client
-client.load_extension("cog.twitter")
 client.run(str(token))
