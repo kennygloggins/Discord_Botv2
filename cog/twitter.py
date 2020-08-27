@@ -1,12 +1,13 @@
 from bs4 import BeautifulSoup
-import requests
+from cog.webhook import twitter_webhook
 from config import *
+import discord
+from discord import Webhook, RequestsWebhookAdapter
+from discord.ext import commands, tasks
+import requests
 import re
 from pymongo import MongoClient
-import discord
-from discord.ext import commands, tasks
-from discord import Webhook, RequestsWebhookAdapter
-from cog.webhook import twitter_webhook
+
 
 """
 source = requests.get(f'https://mobile.twitter.com/HaasF1Team/with_replies').text
@@ -37,7 +38,7 @@ class Twitter(commands.Cog):
     async def on_ready(self):
         print("Twitter extension loaded.")
 
-    @tasks.loop(minutes=1.0)
+    @tasks.loop(minutes=twitter_frequency)
     async def bgtask(self):
         printParsedTweet()
 

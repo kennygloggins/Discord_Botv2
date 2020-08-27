@@ -5,7 +5,7 @@ import discord
 
 
 def reddit_webhook(title, post, name):
-    img = [".jpeg", ".png", ".gif", ".bmp"]
+    img = [".jpeg", ".png", ".gif", ".bmp", ".jpg"]
     try:
         color = team_colors[name]
     except KeyError:
