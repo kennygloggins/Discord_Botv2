@@ -28,7 +28,7 @@ def reddit_webhook(title, post, name):
     return data"""
 
 
-def twitter_webhook(handle, tweets, color, profilePic): # , tweet_id
+def twitter_webhook(handle, tweets, color, profilePic):  # , tweet_id
     data = []
     for tweet in tweets:
         data.append(

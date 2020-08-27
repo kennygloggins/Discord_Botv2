@@ -4,7 +4,8 @@ from config import *
 import re
 from pymongo import MongoClient
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
+from discord import Webhook, RequestsWebhookAdapter
 from cog.webhook import twitter_webhook
 
 """
@@ -19,31 +20,41 @@ server = MongoClient(mongserver)
 db = server.twitter_db
 posts = db.reddit_test
 
-class Twitter(commands.Cog):
+webhook = Webhook.partial(
+    webhook_id_reddit, webhook_token_reddit, adapter=RequestsWebhookAdapter()
+)
 
+
+class Twitter(commands.Cog):
     def __init__(self, client):
         self.client = client
-    
+        self.bgtask.start()
+
+    def cog_unload(self):
+        self.bgtask.cancel()
+
     @commands.Cog.listener()
     async def on_ready(self):
-        print('Twitter extension loaded.')
+        print("Twitter extension loaded.")
 
-    @commands.command()
-    async def ping(self, ctx):
-        await ctx.send("Pong!")
+    @tasks.loop(minutes=1.0)
+    async def bgtask(self):
+        printParsedTweet()
 
-def setup(client):
-    client.add_cog(Twitter(client))
-    
-class TweetParser():
+    @bgtask.before_loop
+    async def before_task(self):
+        print("waiting...")
+        await self.client.wait_until_ready()
+
+
+class TweetParser:
     """Take a tweet's information and rebundle it for use in a webhook.
     The plan is to recreate a conversation when there is one and also
     search for keywords.
     """
-    def __init__(self, twitter_handle, key_words, team_colors):
+
+    def __init__(self, twitter_handle):
         self.twitter_handle = twitter_handle
-        self.key_words = key_words
-        self.team_colors = team_colors
 
     def soup(self):
         """Send request to twitter for each username, run response through 
@@ -70,33 +81,11 @@ class TweetParser():
                 reply = reply.strip("/")
                 # TODO finish filtering reply list and add it to a dictionary
 
-    def parse(self, soup, handle):
-        """Centeralised function for calling individual functions to parse twitter
-        for given usernames.
-
-        Args:
-            soup (data structure): what's returned from BeautifulSoup()
-            handle (str): Twitter username
-
-        Returns:
-            dictionary: contains filtered tweets and profile picture links values for
-            twitter handle keys.
-        """
-        tweets = {}
-        profilePic = soup.find("td", class_="avatar").img["src"]
-        tweet_texts, tweet_ids = self.tweet(soup)
-        filteredTweets = self.filterTweets(tweet_texts)
-        # repliesToR = self.conversation(soup)
-        tweets[handle] = {"filteredTweets": filteredTweets, "profilePic": profilePic}
-        return tweets  # , repliesToR
-
     def tweet(self, soup):
         """Returns a dictionary with tweet id's as keys and their text as values"""
-        tweet_dic = {}
         tweet_lst = soup.find_all(
             "div", class_="tweet-text"
         )  # text of the tweet which we will have to extract with .text
-        tweet_ids = soup.find("div", class_="tweet-text")
         tweet_text_lst = [tweet.text for tweet in tweet_lst]
         tweet_id_lst = [tweet["data-id"] for tweet in tweet_lst]
         tweet_id_text = {
@@ -109,32 +98,41 @@ class TweetParser():
         """Look through tweet texts for keywords and return a 
         list of tweets that contain the words. Also grab just
         the strings out of the div's. Returns a list of strings"""
-        filteredTweets = {}
-        for tweet in tweet_texts:
-            for word in self.key_words:
-                if re.search(word, tweet_texts[tweet]):
-                    filteredTweets[tweet] = tweet_texts[tweet]
-        if len(filteredTweets) == 0:
+        filtered_tweet = []
+        for tweet_id in tweet_texts:
+            for word in twitter_words:
+                if re.search(word, tweet_texts[tweet_id]):
+                    filtered_tweet.append(tweet_texts[tweet_id])
+        if len(filtered_tweet) == 0:
             return None
         else:
-            return filteredTweets
+            return filtered_tweet
 
-    def printParsedTweet(self):
-        """This is main() for now, used to make and run our class
-        and it's functions. It will be called from Discord_Bot.py
-        but everyting will happen here.
-        """
-        for handle in self.twitter_handles:
-            conversation = {}
-            name = handle
-            filteredTweets, profilePic, repliesTo = self.parse(
-                handle, self.key_words
+
+def printParsedTweet():
+    """This is main() for now, used to make and run our class
+    and it's functions. It will be called from Discord_Bot.py
+    but everyting will happen here.
+    """
+    for handle in twitter_handles:
+        user = TweetParser(handle)
+        soup = user.soup()
+        profilePic = soup.find("td", class_="avatar").img["src"]
+        tweets = user.tweet(soup)
+        filteredTweets = user.filterTweets(tweets)
+        if filteredTweets == None:
+            continue
+        else:
+            data = twitter_webhook(
+                handle, filteredTweets, team_colors[handle], profilePic,
             )
-            conversation[handle] = [filteredTweets, profilePic, repliesTo]
-        return conversation
+            try:
+                webhook.send(embeds=data)
+            except InvalidArgument:
+                webhook.send(
+                    content="Too many results, please add more filters in config."
+                )
 
 
-
-
-# data = twitter_webhook(twitHandle, tweets[twitHandle]["filteredTweets"], team_colors[twitHandle], tweets[twitHandle]["profilePic"])  # , tweet_id
-# webhook.send(embeds=data)
+def setup(client):
+    client.add_cog(Twitter(client))
