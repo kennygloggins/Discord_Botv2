@@ -28,14 +28,14 @@ def reddit_webhook(title, post, name):
     return data"""
 
 
-def twitter_webhook(handle, tweets, color, profilePic):  # , tweet_id
+def twitter_webhook(lst):  # , tweet_id
     data = []
-    for tweet in tweets:
+    for item in lst:
         data.append(
-            Embed(description=tweet, color=Color(color)).set_author(
-                name=f"@{handle}",
-                url=f"https://mobile.twitter.com/{handle}",
-                icon_url=profilePic,
+            Embed(description=item[1], color=Color(item[2])).set_author(
+                name=f"@{item[0]}",
+                url=f"https://mobile.twitter.com/{item[0]}",
+                icon_url=item[3],
             )
         )
     return data
