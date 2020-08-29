@@ -1,7 +1,6 @@
-from config import twitter_handles, webhook_id_twitter, webhook_token_twitter
-import discord
+from config import webhook_id_twitter, webhook_token_twitter
 from discord import Webhook, RequestsWebhookAdapter
-from discord.ext import commands, tasks
+from discord.ext import commands
 
 webhook = Webhook.partial(
     webhook_id_twitter, webhook_token_twitter, adapter=RequestsWebhookAdapter()

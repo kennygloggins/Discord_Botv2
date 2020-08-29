@@ -4,18 +4,10 @@
 # Project: F1 Discord Bot
 
 
-import discord
 from discord.ext import commands
-from discord import Webhook, RequestsWebhookAdapter
-import asyncio
 
 # Check config.py and change these values
-from config import (
-    token,
-    id_channel,
-    webhook_id_reddit,
-    webhook_token_reddit,
-)
+from config import token
 
 
 client = commands.Bot(command_prefix=".")

@@ -11,7 +11,6 @@ from config import (
     webhook_id_reddit,
     webhook_token_reddit,
 )
-import discord
 from discord import Webhook, RequestsWebhookAdapter
 from discord.ext import commands, tasks
 import re

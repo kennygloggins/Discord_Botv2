@@ -1,19 +1,21 @@
-from discord import Webhook, RequestsWebhookAdapter, Embed, Color
-from config import webhook_id_reddit, webhook_token_reddit, team_colors
+from discord import Embed, Color
+from config import team_colors
 import re
-import discord
 
 
 def reddit_webhook(title, post, name):
     img = [".jpeg", ".png", ".gif", ".bmp", ".jpg"]
+    video = ["youtube", ".mp4", ".mov", ""]
     try:
         color = team_colors[name]
     except KeyError:
         color = 0
-    for x in img:
-        if re.search(x, post):
+    for ftype in img:
+        if re.search(ftype, post):
             data = Embed(title=title, color=Color(color), url=post).set_image(url=post)
             return data
+    
+    #for ftype in video
 
     data = Embed(title=title, color=Color(color), url=post)
     return data
@@ -53,4 +55,3 @@ def twitter_webhook(lst):  # , tweet_id
 
     def embed(self):
         embed = Embed(color=self.color, desc)"""
-
