@@ -4,33 +4,28 @@ import re
 
 
 def reddit_webhook(title, post, name):
+
     img = [".jpeg", ".png", ".gif", ".bmp", ".jpg"]
     video = ["youtube", ".mp4", ".mov", ""]
+
     try:
         color = team_colors[name]
     except KeyError:
         color = 0
+
     for ftype in img:
         if re.search(ftype, post):
             data = Embed(title=title, color=Color(color), url=post).set_image(url=post)
             return data
-    
-    #for ftype in video
+
+    # for ftype in video
 
     data = Embed(title=title, color=Color(color), url=post)
     return data
 
 
-"""def twitter_webhook(handle, tweet, color, profilePic):
-    data = Embed(description=tweet, color=Color(color)).set_author(
-        name="@KennyGLoggins",
-        url="https://mobile.twitter.com/KennyGLoggins",
-        icon_url="https://pbs.twimg.com/profile_images/567516929/Kenny_Powers_x96.jpg",
-    )
-    return data"""
+def twitter_webhook(lst):
 
-
-def twitter_webhook(lst):  # , tweet_id
     data = []
     for item in lst:
         data.append(
@@ -43,15 +38,14 @@ def twitter_webhook(lst):  # , tweet_id
     return data
 
 
-"""class Webhook:
+def convo_webhook(main, reply):
 
-    def __init__(self, authors_name, authors_url, authors_pic, footer, color, media):
-        self.authors_name = authors_name
-        self.authors_url = authors_url
-        self.authors_pic = authors_pic
-        self.footer = footer
-        self.color = color
-        self.media = media
 
-    def embed(self):
-        embed = Embed(color=self.color, desc)"""
+    data = [Embed(description=main[1], color=Color(main[2])).set_author(
+            name=f"@{main[0]}", url=main[4], icon_url=main[3],
+        ),
+        Embed(description=reply[1], color=Color(reply[2])).set_author(
+            name=f"@{reply[0]}", url=reply[4], icon_url=reply[3],
+        )
+    ]
+    return data
