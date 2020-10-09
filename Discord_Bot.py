@@ -12,6 +12,7 @@ from config import token
 
 client = commands.Bot(command_prefix=".")
 
+
 # Print's the bot's information to console when on and ready.
 @client.event
 async def on_ready():

@@ -10,23 +10,30 @@ from config import (
     sublist,
     webhook_id_reddit,
     webhook_token_reddit,
+    dz_id_twitter,
+    dz_token_twitter,
+    team_colors,
 )
 from discord import Webhook, RequestsWebhookAdapter
 from discord.ext import commands, tasks
-import re
+# import re
 import praw
 from pymongo import MongoClient
 from cog.webhook import reddit_webhook
 
 
 # Setup connection to mongodb collection
-server = MongoClient(mongserver)
-db = server.twitter_db
-posts = db.reddit_test
+reddit_db = MongoClient(mongserver).twitter_db.reddit
+
+# Filter for our aggregation
+pipelineP = [{"$match": {"posted": False}}]
 
 webhook = Webhook.partial(
     webhook_id_reddit, webhook_token_reddit, adapter=RequestsWebhookAdapter()
 )
+# webhook = Webhook.partial(
+#     dz_id_twitter, dz_token_twitter, adapter=RequestsWebhookAdapter()
+# )
 
 # Grab bot info from praw.ini
 reddit = praw.Reddit("bot1")
@@ -46,7 +53,7 @@ class Reddit(commands.Cog):
 
     @tasks.loop(minutes=reddit_frequency)
     async def bgtask(self):
-        printParsedReddit()
+        filterPosts(reddit_db, reddit, pipelineP, webhook, name_list)
 
     @bgtask.before_loop
     async def before_task(self):
@@ -54,44 +61,62 @@ class Reddit(commands.Cog):
         await self.client.wait_until_ready()
 
 
-def find_name(fname):
-    for key, value in name_list.items():
-        for x in value:
-            if re.search(x, fname):
-                return key
-    return "F1"
+def find_color(title, handles):
+    title = title.lower()
+    for handle in handles:
+        for name in handles[handle]:
+            if title.find(name) >= 0:
+                return handle.lower()
+    return "f1"
 
 
 # Grab post from a subreddit and only return a url if it hasn't been returned before
-def ping_reddit(sub, count):
-    danger = reddit.subreddit(sub)
-    new_title = []
-    new_post = []
-    new_name = []
-    for post in danger.hot(limit=10):
+def ping_reddit(sub, count, database, handles):
+    subred = reddit.subreddit(sub)
+    for post in subred.hot(limit=10):
         if post.ups > count and not post.stickied:
             # Check in database to see if we've posted this submission before
-            if db.reddit_test.find_one({"post_id": post.id}):
+            if database.find_one({"post_id": post.id}):
                 pass
             else:
-                post_id = {"post_id": post.id}
-                postdb_id = posts.insert_one(post_id).inserted_id
-                # Haven't posted before so store submission ID in database and
-                # append the title and url onto our lists
-                new_title.append(post.title)
-                new_post.append(post.url)
-    for name in new_title:
-        new_name.append(find_name(name.lower()))
-    return new_title, new_post, new_name
+                color = find_color(post.title, handles)
+                data = {
+                    "post_id": post.id,
+                    "title": post.title,
+                    "url": post.url,
+                    "color": team_colors[color],
+                    "posted": False,
+                }
+                database.insert_one(data).inserted_id
+                # Haven't posted before so store submission ID in database
 
 
-def printParsedReddit():
-    for item in sublist:
-        titles, posts, names = ping_reddit(item[0], item[1])
-        for title, post, name in zip(titles, posts, names):
-            data = reddit_webhook(title, post, name)
-            webhook.send(embed=data)
+def filterPosts(database, reddit, pipeline, webhook, handles):
+    """
+    Look through our aggregate(contains filtered posts) for any
+    documents, format them for discord, and then send them in a
+    discord webhook
+    """
 
+    lst = []
+    empty = 0  # remains 0 if there are no entries for the aggregation
+
+    for sub in sublist:
+        ping_reddit(sub[0], sub[1], database, handles)
+    for doc in database.aggregate(pipeline):
+        empty += 1
+        # Extract the information from the db.
+        lst.append([doc["title"], doc["url"], doc["color"]])
+        # Update the db to show that we've posted this entry
+        database.update_one({"_id": doc["_id"]}, {"$set": {"posted": True}})
+
+    if empty > 0:
+        # Format for embed
+        data = reddit_webhook(lst)
+        # Send message
+        print('Found a post(s) and sending it to discord')
+        webhook.send(embeds=data)
+    
 
 def setup(client):
     client.add_cog(Reddit(client))

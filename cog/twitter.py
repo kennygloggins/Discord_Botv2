@@ -24,15 +24,18 @@ convo = db.convo
 
 # Filter for our aggregation
 pipelineP = [{"$match": {"text": {"$regex": twitter_words}, "posted": False}}]
-pipelineC = [{"$match": {"$expr": {"$ne": ["$main.handle", "$reply.handle"]}, "posted": False}}]
+pipelineC = [
+    {"$match": {
+        "$expr": {"$ne": ["$main.handle", "$reply.handle"]}, "posted": False}}
+]
 
 # Variable for server to post in
 webhook = Webhook.partial(
-            bl_id_twitter, bl_token_twitter, adapter=RequestsWebhookAdapter()
-        )
+    bl_id_twitter, bl_token_twitter, adapter=RequestsWebhookAdapter()
+)
 # webhook = Webhook.partial(
-#             dz_id_twitter, dz_token_twitter, adapter=RequestsWebhookAdapter()
-#         )
+#     dz_id_twitter, dz_token_twitter, adapter=RequestsWebhookAdapter()
+# )
 
 
 class Twitter(commands.Cog):
@@ -137,16 +140,11 @@ class TweetParser:
                     "text": tweet_text_lst[i].strip(),
                     "link": f"https://mobile.twitter.com/{twitter_handle}/status/{tweet_id_lst[i]}",
                     "profilePic": profilePic,
-                    "color": team_colors[twitter_handle],
+                    "color": team_colors[twitter_handle.lower()],
                     "posted": False,
                 }
-                # Look for any matching ID's in that db so we don't enter in
-                # something twice
-                if posts.find_one({"tweet_id": tweet_id_lst[i]}):
-                    pass
-                else:
-                    # Insert collection into the db
-                    posts.insert_one(entry).inserted_id
+                # Insert collection into the db
+                posts.insert_one(entry).inserted_id
 
     def filterTweets(self):
         """
@@ -158,13 +156,14 @@ class TweetParser:
         lst = []
         empty = 0  # remains 0 if there are no entries for the aggregation
 
-
         for doc in posts.aggregate(pipelineP):
             empty += 1
             # Extract the information from the db.
-            lst.append([doc["handle"], doc["text"], doc["color"], doc["profilePic"]])
+            lst.append([doc["handle"], doc["text"],
+                        doc["color"], doc["profilePic"]])
             # Update the db to show that we've posted this entry
-            db.tweets.update_one({"_id": doc["_id"]}, {"$set": {"posted": True}})
+            db.tweets.update_one({"_id": doc["_id"]}, {
+                                 "$set": {"posted": True}})
 
         if empty > 0:
             # Format for embed
@@ -179,7 +178,8 @@ class TweetParser:
 
         for tweet in tweet_lst:
             if tweet.find("div", class_="tweet-reply-context"):
-                reply_tweet_id.append(tweet.find("div", class_="tweet-text")["data-id"])
+                reply_tweet_id.append(tweet.find(
+                    "div", class_="tweet-text")["data-id"])
                 reply_to.append(
                     tweet.find("div", class_="tweet-reply-context").a["href"]
                 )
@@ -193,7 +193,8 @@ class TweetParser:
 
         for handle_id in interested_tweets:
             if len(handle_id) > 0:
-                self.soup_convo(soup, handle_id["tweet_id"], handle_id["handle"])
+                self.soup_convo(
+                    soup, handle_id["tweet_id"], handle_id["handle"])
 
     def twitter_convo(self, soup):
         """
@@ -207,7 +208,8 @@ class TweetParser:
         main_handle = main.find("a")["href"][1:-4]
         main_avatar = main.find("img")["src"]  # Profile pic for main tweet
         main_id = main.find("div", {"class": "tweet-text"})["data-id"]
-        main_text = main.find("div", {"class": "tweet-text"}).get_text(strip=True)
+        main_text = main.find(
+            "div", {"class": "tweet-text"}).get_text(strip=True)
 
         # Grab variables for reply tweet in convo
         reply_tweet = soup.find("div", {"class": "tweet-detail"})
@@ -217,13 +219,21 @@ class TweetParser:
         reply_text = reply_tweet.find("div", {"class": "tweet-text"}).get_text(
             strip=True
         )
+        try:
+            main_color = team_colors[main_handle.lower()]
+        except KeyError:
+            main_color = None
+        try:
+            reply_color = team_colors[reply_handle.lower()]
+        except KeyError:
+            reply_color = None
 
         # Format into json for mongoDB
         entry = {
             "main": {
                 "handle": main_handle,
                 "avatar": main_avatar,
-                "color": team_colors[main_handle],
+                "color": main_color,
                 "tweet_id": main_id,
                 "text": main_text,
                 "link": f"https://mobile.twitter.com/{main_handle}/status/{main_id}",
@@ -231,20 +241,15 @@ class TweetParser:
             "reply": {
                 "handle": reply_handle,
                 "avatar": reply_avatar,
-                "color": team_colors[reply_handle],
+                "color": reply_color,
                 "tweet_id": reply_id,
                 "text": reply_text,
                 "link": f"https://mobile.twitter.com/{reply_handle}/status/{reply_id}",
             },
             "posted": False,
         }
-        # Look for any matching ID's in that db so we don't enter in
-        # something twice
-        if convo.find_one({"main.tweet_id": main_id}):
-            pass
-        else:
-            # Insert collection into the db
-            convo.insert_one(entry).inserted_id
+        # Insert collection into the db
+        convo.insert_one(entry).inserted_id
 
     def filterConvo(self):
         content = "➖➖➖➖➖➖➖➖➖➖➖➖"
@@ -267,7 +272,8 @@ class TweetParser:
                 doc["reply"]["link"],
             ]
             # Update the db to show that we've posted this entry
-            db.convo.update_one({"_id": doc["_id"]}, {"$set": {"posted": True}})
+            db.convo.update_one({"_id": doc["_id"]}, {
+                                "$set": {"posted": True}})
             # Format for embed
             data = convo_webhook(main_lst, reply_lst)
             # Send message
@@ -285,7 +291,6 @@ def printParsedTweet():
     user.store_tweet()
     user.filterTweets()
     user.filterConvo()
-
 
 
 def setup(client):
